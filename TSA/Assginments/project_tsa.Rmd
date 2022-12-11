@@ -1,0 +1,262 @@
+---
+title: 'Project Report: CH5350'
+author: "Abhijeet Mavi"
+output:
+  word_document: default
+  html_document: default
+---
+
+
+## TAR Modelling
+
+For a 2-regime TAR model, we have
+
+$$v[k]=-d_0^{(1)}-d_1^{(1)} v[k-1]-d_2^{(1)}v[k-2] +e_1[k]$$
+
+$$v[k]=-d_0^{(2)}-d_1^{(2)} v[k-1]-d_2^{(2)}v[k-2] +e_2[k]$$
+
+where, $v[k-1]<=\gamma$ for first series and $v[k-1]>\gamma$ for the second series. Here, the error in question have different standard deviations as well.
+
+Now, using **tar()** we will fit a TAR model here. Let's try for a higher model.
+
+```{r}
+load('projq1a.Rdata')
+library(TSA)
+
+plot(vk,type='l')
+
+```
+Clearly, the series does not tell anything straight forward. We will now check for a high order TAR model.
+
+```{r}
+tar56mod=tar(vk,5,6,5)
+acf(tar56mod$residuals)
+pacf(tar56mod$residuals)
+
+```
+
+Here, I observe that the model is properly underfit, but has a lot of parameters making it an expensive computational process. We, instead fit a lower order TAR model as follows:
+
+```{r}
+tar101mod=tar(vk,1,0,1)
+acf(tar101mod$residuals)
+pacf(tar101mod$residuals)
+
+tsdiag(tar101mod)
+```
+
+It has some values coming out for white noise test. Let's see what we get for TAR(2,0,2).
+
+```{r}
+tar202mod=tar(vk,2,0,2)
+acf(tar202mod$residuals)
+pacf(tar202mod$residuals)
+```
+
+This model fits perfectly for our given dataset. Hence, we conclude that the given dataset follows a 2-regime TAR(2,0,2) model. PLease note that, I tried various permutations of model orders and this one came to be with least number of parameters.
+
+Now, we check the parmaters for our proven TAR model.
+
+```{r}
+tar202mod$qr1$coefficients
+tar202mod$qr2$coefficients
+
+tar202mod$thd
+
+tsdiag(tar202mod)
+```
+
+Hence, our 2-regime TAR model is as follows. 
+
+$$v[k]=-0.73-0.37v[k-1]+0.25v[k-2]+e_1[k]$$
+
+Here, $\sigma^2_1 = 1.53$
+
+$$v[k]=0.80 + e_2[k]$$
+
+
+And, $\sigma^2_2=0.97$
+
+Here, the threshold $\gamma = 0.88$
+
+We now look at **bootstrapping**. I first extracted the residuals from the two series and then sampled them to add to the original series.
+
+
+```{r}
+
+coef_q1=matrix(NA,nrow=200,ncol=3)
+coef_q2={}
+
+for (i in 1:200){
+s1=sample(tar202mod$residuals, length(tar202mod$residuals),replace = T)
+
+
+vk_new=tar.sim(n=198,tar202mod,e=s1,ntransient = 0)
+
+tar_new=tar(vk_new$y[1:196],2,0,2)
+
+coef_q1[i,1]=tar_new$qr1$coefficients[1]
+coef_q1[i,2]=tar_new$qr1$coefficients[2]
+coef_q1[i,3]=tar_new$qr1$coefficients[3]
+
+coef_q2[i]=tar_new$qr2$coefficients
+}
+
+hist(coef_q2)
+
+hist(coef_q1[which(is.na(coef_q1[,3])==F),3])
+
+hist(coef_q1[,2])
+
+hist(coef_q1[,1])
+
+mean(coef_q1[,1])
+var(coef_q1[,1])
+
+mean(coef_q1[,2])
+var(coef_q1[,2])
+
+mean(coef_q1[which(is.na(coef_q1[,3])==F),3])
+var(coef_q1[which(is.na(coef_q1[,3])==F),3])
+
+mean(coef_q2)
+var(coef_q2)
+```
+
+In the bootstrapping method, I used **tar.sim()** to simulate the TAR model for 198 time points. We did so, so that we can have 2 NA values for the **xstart** attribute of the tar.sim. I took the new residues through **sample()** function in R and then tar.sim() was used to simulate the time series data.
+
+The bootstrapping results are clearly shown above. I have tabulated the same as shown below.
+
+``` {r}
+a1=c(sqrt(var(coef_q1[,1])),sqrt(var(coef_q1[,2])),sqrt(var(coef_q1[which(is.na(coef_q1[,3])==F),3])),sqrt(var(coef_q2)))
+
+a2=c(mean(coef_q1[,1]),mean(coef_q1[,2]), mean(coef_q1[which(is.na(coef_q1[,3])==F),3]),mean(coef_q2))
+
+final_table=as.matrix(cbind(a2,a1))
+rownames(final_table)=c('Regime1_d0','Regime1_d1','Regime1_d2','Regime2_d0')
+colnames(final_table)=c('Mean','Standard Deviation')
+
+final_table
+
+```
+
+As we can see, the mean and error are close to the real value in the $99\%$ confidence interval for all paramters.
+
+## Measles Data: New York City (1928:1972)
+
+We first plot the series here as follows and check if it needs differencing. Also, I have taken 434/534 data points as test set and the rest as the validation set. But, I presumed that the dta shows non-stationarity in variance as can be vaguely conveyed through the plot of the model.
+
+```{r}
+library(readr)
+monthly_reported_number_of_cases <- read_csv("monthly-reported-number-of-cases.csv")
+
+an=monthly_reported_number_of_cases$`Monthly reported number of cases of measles, New York city, 1928-1972`
+
+an=as.numeric(an)
+
+an1=as.numeric(an[1:434])
+library(forecast)
+plot(an1)
+
+an1=BoxCox(as.numeric(an1),lambda = 'auto')
+
+plot(an1)
+
+library(aTSA)
+adf.test(an1)
+
+
+```
+
+Hence, as one can see the data is much well-scattered now. **Boxcox** routine from forecast gave us $\lambda = 1.22$.
+
+Clearly, the adf.test() shows that we do not need to difference the series. I now try to check for ACF and PACF of the series to gather some information for the true model.
+
+
+```{r}
+
+acf(an1,lag.max = 50)
+pacf(an1,lag.max = 50)
+
+```
+
+It is pretty evident from the ACF plot that we are dealing with a periodic model of period=**12**. Now, I fit the sinusoidal regression model to this series. 
+
+```{r}
+tvec=1:434
+lmsincos=lm(an1[1:434]~I(sin(2*pi*tvec/12))+I(cos(2*pi*tvec/12)))
+
+lmres=lmsincos$residuals
+plot(lmres,type='l')
+
+acf(lmres,lag.max = 50)
+
+periodogram(lmres)
+
+```
+
+The series here clearly shows that there is decay in periodicity and hence we go for SARIMA modelling. One may wonder why do we do SARIMA. but seasonality component cannot be completely nullified by just regression modelling.
+
+```{r}
+
+ar401102=arima(lmres,c(4,0,1),seasonal=list(order=c(4,0,2)))
+
+ar401102
+```
+
+I started with a model with high AR coefficients, and I ended up with NA values. I then fit something smaller and through various permutations and combinations, I got the following model as follows:
+
+```{r}
+ar001102=arima(lmres,c(0,0,1),seasonal=list(order=c(1,0,2)))
+
+tsdiag(ar001102)
+
+ar001102
+
+```
+
+Clearly the model satisfies the BLP test for whiteness and is parsimonious also. Fuhtermore, the model is not overfitting in this respect with $99\%$ confidence interval. Hence, this is our final model with period 12. But this is not the right answer since parameters are overfitted. Also, there are some unexplained effects for the p-value being low at later intervals. We now turn to something called **constrained SARIMA** model. Through various trials I concluded that the following method fit the best where AR1 and SMA2 are rendered 0. We get a p-value well above 0.05, hence making our model consistent.
+
+```{r}
+
+ar201212=arima(lmres,c(02,0,02),seasonal=list(order=c(0,0,2))
+               ,fixed = c(0,NA,NA,NA,NA,0,NA),transform.pars = F)
+ar201212
+Box.test(ar201212$residuals)
+```
+
+$$v[k]=(\frac{(1+0.5429q^{-2})}{1+1.3772q^{-1}+0.4683q^{-2}}(1+0.2287q^{-24})e[k]+2.152sin(2 \pi t/12)-1.36cos(2 \pi t/12)+6.856)^1.22$$
+
+
+Now, I simulated this series for 534 data points and then checked RMSE for last 100 data points using **rmse()** function in R. 
+
+
+
+
+
+
+```{r}
+library(CombMSC)
+s1=sarima.Sim(n=534,period=12, model=list(ar=c(0,0.5421),ma=c(0.5353,0.2816)),seasonal=list(ma=c(0.8621,0)))
+
+tvec2=1:534
+
+s2=(2.152*sin(2*pi*tvec2/12))-(1.360*cos(2*pi*tvec2/12))+6.856
+
+s_final=(s1+s2)^1.22
+
+rmse=(s_final[which(is.na(s_final)==F)]-an[which(is.na(s_final)==F)])^2
+rmse=mean(rmse[431:530])
+rmse=sqrt(rmse)
+
+```
+
+
+Hence, the final RMSE comes out to be about 752.807.
+
+
+
+
+
+
+

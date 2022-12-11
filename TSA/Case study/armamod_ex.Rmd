@@ -1,0 +1,490 @@
+---
+title: "ARMA Modelling: A Simulation Case Study"
+author: Arun K. Tangirala
+date: \today
+output: 
+  beamer_presentation:
+    theme: "Madrid"
+    colortheme: "crane"
+    fonttheme: "professionalfonts"
+    highlight: tango
+    keep_tex: true
+    includes:
+      in_header: myheader.tex
+handout: true
+
+params:
+  ar_P:
+    label: "Order of AR model"
+    value: 5
+    input: slider
+    min: 1
+    max: 10
+    step: 1
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE,highlight=TRUE,background='gray33')
+knitr::opts_chunk$set(tidy=TRUE,tidy.opts=list(width.cutoff=65))
+knitr::opts_chunk$set(dev='pdf')
+
+require(TSA)
+require(forecast)
+```
+
+```{r hooks, echo=FALSE}
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    if (options$size == "normalsize")
+      return('\\scriptsize')
+    else
+      return(paste('\\',options$size,sep=""))
+  else
+    return('\\normalsize')
+    return('\\vspace{-3mm}')
+})
+```
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(mysize=TRUE)
+```
+
+
+# Building an ARMA model: Example
+
+In this case study, we shall learn how to systematically build an ARMA model.
+
+- We shall also take this opportunity to discuss other subtle aspects of time-series modelling.
+
+# Data generating process
+
+Let us simulate an ARMA(1,1) process,
+$$ v[k] = \dfrac{1 + 0.6q^{-1}}{1 - 0.7q^{-1}}e[k]$$
+where $e[k]$ is a zero-mean, unit-variance GWN process.
+
+```{r mysize=T}
+# For purposes of illustration, generate WN for fixed seed
+set.seed(240) # can change it to any integer
+N = 1200 # Length of series
+ek = rnorm(N)
+# Specify model and call arima.sim (look up help on arima.sim)
+mod_dgp <- list(ar=0.7,ma=0.6,order=c(1,0,1))
+vk <- arima.sim(mod_dgp,n=N,innov=ek)
+```
+
+# Visualization
+
+The first step is always to visualize the series and inspect it by the eye.
+
+```{r fig.align='center',out.width="70%",echo=2,mysize=T}
+par(bty='l',cex.axis=1.2,cex.lab=1.2,mgp=c(2,0.5,0))
+plot(vk,ylab="Series",xlab="Time",main="",lwd=2)
+```
+
+# Inferences
+
+- No visually evident non-stationarities
+- Absence of outliers
+- No missing observations
+
+In a full-fledged modelling exercise, we should be conducting the stationarity tests to determine the presence of unit roots and/or trends. There exist efficient stationarity tests for this purpose (which we shall learn later). 
+
+# Histogram
+
+```{r fig.align='center',out.width="70%",echo=-2,mysize=T}
+# Examine the histogram (to get a feel of the distribution)
+par(cex.axis=1.2,cex.lab=1.2,par(mgp=c(2,0.5,0)))
+hist(vk,probability =T,col='gray',font.axis=2,main="",xlab="Value")
+```
+
+# Distribution estimate
+
+The histogram is suggestive of a Gaussian distribution.
+
+**\alert{Q:}** 
+- Which distribution have we examined? 
+- Is it the marginal, joint? 
+- sWhen is the histogram meaningful?
+
+\pause
+
+\vfill
+
+Note that we can turn to distribution fitting tools and obtain a rigorous estimate of the distribution or density function. However, the ``visual'' estimation should suffice for now.
+
+It is customary next to examine the **summary statistics**
+
+# Summary
+
+
+```{r mysize=T}
+summary(vk)
+```
+
+Ideally one should conduct a test of zero mean at this stage (one-sample hypothesis test). Observe that the sample median and mean are close to each other (is this expected?)
+
+Let's examine the auto- and partial auto-correlation functions next to determine the correlation structure.
+
+# ACF of the series
+
+```{r out.width="70%",fig.align='center',echo=2,mysize=T}
+par(bty='l',cex.axis=1.2,cex.lab=1.2,mgp=c(2.5,1,0),font.lab=2,font.axis=2)
+acf(vk,lag.max=20,ylab="ACF of series",main="",lwd=2)
+```
+
+# PACF of the series
+
+```{r out.width="70%",fig.align='center',echo=2,mysize=T}
+par(bty='l',cex.axis=1.2,cex.lab=1.2,mgp=c(2.5,1,0),font.lab=2,font.axis=2)
+pacf(vk,lag.max=20,ylab="PACF of series",main="",lwd=2)
+```
+
+# Inferences on the correlation structure
+
+> - Series has significant temporal correlation - therefore a time-series model can be built
+> - Stationary process (rigorous tests are in general required)
+> - Moving average and auto-regressive behaviour observed.
+
+\pause
+
+\vfill
+
+\begin{center}
+What are the possible model structures and their respective orders?
+\end{center}
+
+# Choices and general guidelines
+
+We have three choices for the given series
+
+\begin{enumerate}
+\item Moving Average model of order $M = 8$
+\item Auto-Regressive model of order $P = 5$
+\item ARMA model of orders to be determined.
+\end{enumerate}
+
+In the absence of any compelling **end-use** reasons, the following criteria may be used to determine the suitability of model type and order.
+
+- Principle of parsimony
+- Ease of estimation (and implementation)
+
+\pause
+
+We shall, therefore, estimate AR and ARMA models of appropriate orders.
+
+# Fitting an AR model
+
+Let's estimate an AR model of specified order (as suggested by PACF)
+
+```{r mysize=T}
+ar_ord <- params$ar_P
+```
+
+\vspace{-4mm}
+$$ v[k] + \sum_{i=1}^{`r params$ar_P`}d_iv[k-i] = e[k] $$
+AR models can be estimated using linear LS methods.
+```{r mysize=T}
+arPmod = ar(vk,aic=F,order.max=ar_ord)
+```
+
+- The \texttt{ar} routine can search over a range of model order and return the best one as per the Akaike Information Criterion (AIC)
+- Setting AIC to `FALSE' amounts to forcing \texttt{ar} to fit the supplied order
+
+
+# Examining the model
+
+```{r mysize=T}
+print(arPmod)
+```
+
+How good is this model? Two criteria.
+
+# Model assessment
+
+Goodness of model is evaluated in two respects:
+
+- \textbf{Underfit:} Model should have captured the correlation structure adequately well. In other words, no \alert{bias} in predictions on training data. This is tested via \textbf{residual analysis}, in particular, through the **whiteness tests**. 
+
+- \textbf{Overfit:} Model should not capture any realization-specific details. If it does, predictions on a fresh data will degrade. Alternatively, the \alert{variance} in parameter estimates is higher than a sufficiently parametrized model. A **test of significance of parameter estimates** reveals overfits.
+
+# Residual analysis
+
+```{r out.width='75%',fig.align='center',mysize=T}
+title_str = paste("Residuals from AR(",params$ar_P,") Model",sep="")
+tsdisplay(as.ts(arPmod$resid[ar_ord+1:N]),main=title_str,font.lab=2,cex=2,font.main=2,font.axis=2,lwd=1.5)
+```
+
+# Inferences from residual analysis
+
+\begin{itemize}
+\item Residuals are white (based on the significance levels)
+\begin{itemize}
+\item A more rigorous whiteness test is facilitated by the \textbf{Box-Ljung-Pierce (BLP) test.}
+\end{itemize}
+\item Sufficient evidence exists, therefore, that the model has not underfit the data (process characteristics have been well-captured)
+\end{itemize}
+
+\pause
+
+However, the risk is that the model could have overfit (modelling the realization specific characteristics)
+
+# Test for overfit: Significance tests of parameters
+
+An implication of overfitting is that more parameters have been included than that could be identified from the given data. As a result, we obtain parameter estimates with ``high'' errors in the estimates. In order to detect this phenomenon, we conduct \textbf{hypothesis tests} (HT) of zero-truth on parameters. 
+
+Denoting the $i^{\text{th}}$ parameter by $\theta_i$, its true value by $\theta_{i0}$, we are interested in the following:
+\vspace{-6mm}
+\begin{align*} 
+H_0: & \quad \theta_{i0} = 0 \\ 
+H_a: & \quad \theta_{i0} \neq 0 
+\end{align*}
+**Two-sided** hypothesis tests of the above form are known as \alert{\textbf{significance tests}}.
+
+# Significance tests
+
+In order to conduct the aforementioned hypothesis test, what we have with us is the \alert{estimate} $\hat{\theta}_i$. The term significance is used to essentially qualify the estimate $\hat{\theta}_i$ as being **statistically** small or large *given that the true value is zero*. 
+
+- If the latter is deemed to be true, then the null hypothesis $\theta_{i0} = 0$ is rejected, otherwise it fails to be. Hence the name given to these tests.
+
+One of the best ways to conduct a HT is through the **confidence interval** approach. 
+
+# Confidence intervals
+
+The goal of any estimation exercise is not merely to arrive at a point estimate, but also to estimate the **region in which the truth resides.** 
+
+- In the presence of uncertainties, this region is always of non-zero width, which means we can never pin-point the truth (from finite sample sizes) with full confidence. 
+
+- Associated with any finite width region, is a degree of confidence (e.g., 95\%). Hence the name.
+
+- **Corollary:** The 100\% confidence region for $\theta_{0}$ has always infinite width (which is of course, of no use!). In fact, the confidence level and interval width requirements conflict with each other.
+
+\vfill
+
+\small \textbf{Note:} Confidence intervals are constructed for true parameters and NOT for estimates.
+
+# Construction of CI
+
+In order to construct confidence intervals (for any parameter), we require two pieces of information:
+\begin{enumerate}
+\item The estimate, $\hat{\theta}$.
+\item Distribution (or density) of $\hat{\theta}$ including its form and first two moments (e.g., $\mu_{\hat{\theta}}$ and $\Sigma_{\hat{\theta}}$).
+\end{enumerate}
+
+The procedure (of constructing CI) involves two steps. First, write the $100(1-\alpha)\%$ probabilistic interval (PI) for $\hat{\theta}$ using the given distribution. Second, from this PI, construct the $100(1-\alpha)\%$ CI for $\theta_0$.
+
+\begin{alertblock}{Two-sided HT using CI method}
+If the $100(1-\alpha)\%$ CI for $\theta_0$ does not include the postulated value in the null $H_0$, then the we reject $H_0$ in favour of $H_a$ at a significance level $\alpha$. 
+\end{alertblock}
+
+# Simple example
+
+\begin{example}
+Suppose $\hat{\theta}$ follows a Gaussian distribution 
+$$
+\hat{\theta} \sim f(\theta_0,\sigma_{\hat{\theta}})
+$$ 
+and that we wish to construct 95\% CI ($\alpha = 0.05$) for $\theta_0$. Notice that we have an unbiased estimator (since $\mu_{\hat{\theta}} = \theta_0$).
+
+Then, following the previously explained procedure, we have from the properties of Gaussian distributions:
+\begin{align}
+\text{Pr}\left ( \theta_0 - 1.96\sigma_{\hat{\theta}} \leq \hat{\theta} \leq \theta_0 + 1.96\sigma_{\hat{\theta}} \right ) = 0.95 \nonumber \\
+\Longrightarrow \theta_0 \in \left [ \hat{\theta} - 1.96\sigma_{\hat{\theta}}, \hat{\theta} + 1.96\sigma_{\hat{\theta}} \right ] \quad \quad \text{(with 95\% confidence)}
+\end{align}
+
+\end{example}
+
+# Errors in estimates of AR parmeters
+
+Returning to the modelling problem, the AR routine computes the estimates as well as the standard errors (in addition to several other quantities). To know the different values returned by the AR routine, execute in \texttt{R}
+
+```{r mysize=T}
+attributes(arPmod)
+```
+
+\small {The field \texttt{ar} contains the model coefficients, \texttt{resid} contains the residuals and so on. Of particular interest to us is the field \texttt{asy.var.coef}, which contains the asymptotic (large sample) variability in the estimates of AR coefficients.}
+
+# Computing the standard errors and CI
+
+We shall now compute the standard errors (in estimates) and hence the CI (for the true coefficients).
+
+The field \texttt{asy.var.coef} contains $\Sigma_{\hat{\theta}}$, which is and $P \times P$ variance-covariance matrix of the vector $\hat{\boldsymbol{\theta}}$. Diagonals contain the variability in the individual estimates and off-diagonals contain $\sigma_{\hat{\theta}_i\hat{\theta}_j}$, i.e., the linear influence of error in $\hat{\theta}_i$ on that of $\hat{\theta}_j$. We shall be, generally, interested only in the diagonal elements to construct **approximate** confidence intervals.
+
+The standard errors are computed as
+
+```{r mysize=T}
+# Examine the errors in estimates only if residuals are satisfactory
+SigmaP <- arPmod$asy.var.coef
+errPhat <- sqrt(diag(SigmaP))
+```
+
+# Standard errors and CI
+
+Examine the estimates and errors
+```{r mysize=T}
+cat("Estimates: \n",format(arPmod$ar,digits=2),"\n")
+cat("Errors in estimates: \n",format(errPhat,digits=2))
+```
+
+Given that $\hat{\theta}_i$ has an approximate Gaussian distribution, the 99\% intervals are computed as
+
+```{r mysize=T}
+ci_coef <- cbind(arPmod$ar - 2.58*errPhat,arPmod$ar + 2.58*errPhat)
+rownames(ci_coef) <- paste('P',1:length(arPmod$ar),sep='')
+colnames(ci_coef) <- c('CILB','CIUB')
+```
+
+# CIs and refinement
+
+Examining the confidence intervals
+
+```{r mysize=T}
+print(ci_coef,digits=2)
+```
+
+shows that none of the CI for $\theta_5$ includes zero. Therefore, we reject the null hypothesis $\theta_{i,0} = 0, \; i = 1, \cdots, 5$. 
+
+- Note that the choice of model order, the coefficient estimates and therefore the CIs can change with the realization.
+
+\pause
+
+\vfill 
+
+We now turn our attention to the ARMA model possibility and arrive at a suitable model using a similar procedure as above.
+
+# Fitting an ARMA model
+
+The orders of the AR and MA component have to be determined by trial and error since no measure for an intelligent guess is available.
+
+We shall start with ARMA(1,1) model:
+$$ v[k] + d_1v[k-1] = e[k] + c_1e[k-1]$$
+\begin{itemize}
+\item Estimaton of ARMA models requires the use of non-linear least squares (NLS) methods. Alternatively, the well-established maximum likelihood estimation (MLE) method can be used. In fact the MLE contains NLS as a special case.
+\item The \texttt{arima} routine in \texttt{R} is devised for estimating ARMA models (ARIMA is an extension of ARMA to include Integrating processes). By default it uses the MLE algorithm.
+\end{itemize}
+
+# Fitting an ARMA model
+
+We first fit an ARMA(1,1) model using the \texttt{arima} routine.
+```{r mysize=T}
+# Supply the series and order
+arma11mod <- stats::arima(vk,order=c(1,0,1),include.mean=T)
+# The second argument in the order corresponds to the integrating effect, which is assumed to be absent here.
+```
+\vspace{-4mm}
+Observe that we have asked the routine to estimate the mean (this translates to an intercept term in the model).
+
+It is useful to know the fields of the model returned by \texttt{arima} routine.
+```{r }
+attributes(arma11mod)
+```
+
+# ARMA model assessment
+
+We apply the usual model checks, residual analysis and significance tests for parameter estimates.
+
+```{r out.width="65%",fig.align='center'}
+tsdisplay(as.ts(arma11mod$residuals),main="Residual analysis of ARMA(1,1) model",font.lab=2,cex=2,font.main=2,font.axis=2,lwd=1.5)
+```
+
+# Significance tests
+
+The \texttt{arima} routine reports the standard errors in the \texttt{var.coef} field. Furthermore, the estimates are asymptotically unbiased and follow a Gaussian distribution. Therefore, it is straightforward to compute the CIs.
+
+```{r }
+ep_arma11 <- sqrt(diag(arma11mod$var.coef))
+ci_coef3 <- cbind(arma11mod$coef - 2.58*ep_arma11,arma11mod$coef + 2.58*ep_arma11)
+pest_mat <- cbind(arma11mod$coef,ep_arma11,ci_coef3)
+rownames(pest_mat) <- paste('P',1:length(arma11mod$coef),sep='')
+colnames(pest_mat) <- c('Estimate','Error','CILB','CIUB')
+print(pest_mat,digits=2)
+```
+
+# Significance tests
+
+Observe that the estimate of the intercept term is insignificant. Therefore, we re-estimate the ARMA model omitting the intercept term.
+
+```{r mysize=T}
+armamod <- stats::arima(vk,order=c(1,0,1),include.mean=F)
+ep_arma <- sqrt(diag(armamod$var.coef))
+ci_coef4 <- cbind(armamod$coef - 2.58*ep_arma,armamod$coef + 2.58*ep_arma)
+pest_mat <- cbind(armamod$coef,ep_arma,ci_coef4)
+rownames(pest_mat) <- paste('P',1:length(armamod$coef),sep='')
+colnames(pest_mat) <- c('Estimate','Error','CILB','CIUB')
+print(pest_mat,digits=2)
+```
+
+\footnotesize \textbf{Note:} We have not carried out the mandated residual analysis. It is left as a homework.
+
+# Examining the AR and ARMA models
+
+```{r size="tiny"}
+arPmod # Summary does not work with models from 'ar'
+armamod # Summary works and provides additional details
+```
+
+# Which model do we choose?
+
+The final question now that we face is:
+\begin{center}
+Which among the AR(5) and the ARMA(1,1) models is the more appropriate model for the given series?
+\end{center}
+
+**Points to reflect**
+
+\begin{itemize}
+  \item AR(5) model has five parameters whereas the ARMA(1,1) model has two. Therefore, w.r.t. parsimony, the ARMA model is the winner.
+  \item The estimates of AR(5) coefficients are unique whereas only local minima of ARMA(1,1) model estimates are obtained. In this respect, AR models are preferred.
+  \item Goodness of fit, as indicated by the residual variance $\sigma^2_{\varepsilon}$ is lower for the ARMA model than the AR model. Therefore, ARMA is better choice.
+\end{itemize}
+
+# Selecting the model
+
+To answer the question formally, we can turn to \textbf{model selection criteria}. A widely used criterion is the \alert{Akaike Information Criterion} (AIC) (others include Bayesian IC and Final Prediction Error criteria).
+\begin{itemize}
+\item The AIC is a quantitative measure of the trade-off between the approximation error (on the \textbf{training data}) and the variability in the parameter estimates (performance on a \textbf{test data set}).
+\item As the model complexity increases, the approximation error decreases, but the variability in $\hat{\theta}$ increases. The model with the lower AIC achieves the best trade-off and is the winner.
+\end{itemize}
+
+# Akaike's Information Criterion
+
+The AIC expression (as we shall learn later) contains two terms. 
+\begin{itemize}
+\item The first term quantifies the model fit on the training data. It is proportional to the value of likelihood function achieved by the model. 
+\item The second term measures the model's performance a test data. It is quantified by the dimension of the model, i.e., the number of parameters, and the sample size.
+\end{itemize}
+
+\begin{block}{}
+The AIC values for both models under consideration are returned by the \texttt{ar} and \texttt{arima} routines. However, the AIC from the \texttt{ar} uses a different calculation since it does not use the MLE method. In order to make a fair comparison, it is a good idea to use the MLE algorithm for both models.
+\end{block}
+
+# Computing the AIC for both models
+
+```{r}
+# Estimate AR model using MLE (for AIC computation)
+armod_mle <- arima(vk,order=c(5,0,0),include.mean=F)
+armod_mle # Print the model
+# Compare AICs of AR and ARMA models
+armod_mle$aic
+armamod$aic
+```
+
+# Final model
+
+Based on AIC, the AR(`r ar_ord`) is better positioned than the ARMA(1,1) model. However, note the improvement in AIC *estimate* is negligibly small. Thus, we still choose the ARMA model over the AR model keeping in mind the economy of model complexity.
+
+```{r }
+arma_th <- format(armamod$coef,digits=2)
+var_e <- format(armamod$sigma2,digits=4)
+ep_arma <- format(sqrt(diag(armamod$var.coef)),digits=2)
+```
+
+The estimated model is:
+\vspace{-4mm}
+\begin{empheq}[box=\fbox]{align}
+v[k] = \dfrac{1 + \underset{(\pm `r ep_arma[2]`)}{`r arma_th[2]`}q^{-1}}{1 + \underset{(\pm `r ep_arma[1]`)}{`r arma_th[1]`}q^{-1}}e[k], && e[k] \sim \mathcal{N}(0,`r var_e`)
+\end{empheq}
+\vspace{-5mm}
+{\small \begin{itemize}
+\item The model is in agreement with the data generating process (which is mostly a coincidence). 
+\item \textbf{Cross-validation} on a test data set is left as a homework.
+\end{itemize}}

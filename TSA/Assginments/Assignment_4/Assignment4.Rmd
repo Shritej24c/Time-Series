@@ -1,0 +1,405 @@
+---
+title: "Assignment_4"
+author: "Shritej Chavan (BE14B004)"
+date: "October 8, 2018"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Q.1 Discrete Time Fourier Series
+
+i) $$x[k] = 4sin\left(\frac{\pi(k-2)}{3}\right)$$
+
+```{r}
+Np = 6 # Fundamental time period
+k = seq(0,Np)
+x = 4*sin(pi*(k-2)/3) 
+c = rep ( 0 ,Np) #Intialise to zeros
+for (h in 1 :Np) {
+  for (h1 in 1 :Np) {
+    c[h] = c[h] + (x[h1]*exp(-1i*2*pi*(h1-1)*(h-1)/Np))
+  }
+  c[h] = c[h]/Np 
+}
+plot(seq(0 ,1-(1/Np),1/Np),abs(c),type="l",main = "Magnitude plot", xlab = "Frequency(rad/s)", ylab = "|c|")
+frame()
+plot(seq(0,1-(1/Np), 1/Np), Arg(c)*180/pi, type = "l", main = "Phase plot", xlab = "Frequency(rad/s)", ylab = "Phase")
+
+```
+
+ii) $$ x[k] = cos\left(\frac{2\pi}{3}k\right) + sin\left(\frac{2\pi}{5}k\right)$$
+The above signal has fundamental period of 15 samples. The fourier coefficients of the signal are given by 
+
+$$c_n = \frac{1}{15}\sum_{k=0}^{14}x[k]exp(-2j\omega n k)$$
+```{r}
+Np = 15 # Fundamental time period
+k = seq(0,Np)
+x = cos(2*pi*k/3) + sin(2*pi*k/5) 
+c = rep ( 0 ,Np) #Intialise to zeros
+for (h in 1 :Np) {
+  for (h1 in 1 :Np) {
+    c[h] = c[h] + (x[h1]*exp(-1i*2*pi*(h1-1)*(h-1)/Np))
+  }
+  c[h] = c[h]/Np 
+}
+plot(seq(0 ,1-(1/Np),1/Np),abs(c),type="l",main = "Magnitude plot", xlab = "Frequency(rad/s)", ylab = "|c|")
+frame()
+plot(seq(0,1-(1/Np), 1/Np), Arg(c)*180/pi, type = "l", main = "Phase plot", xlab = "Frequency(rad/s)", ylab = "Phase")
+
+
+```
+
+iii) $$x[k] = cos\left(\frac{2\pi}{3}k\right)sin\left(\frac{2\pi}{5}k\right)$$
+Therefore,
+
+$$x[k] = 0.5\left(sin(\frac{16\pi}{15}k) - sin(\frac{4\pi}{15}k)\right)$$
+```{r}
+Np = 15 # Fundamental time period
+k = seq(0,Np)
+x = 0.5*(sin(16*pi*k/15)- sin(4*pi*k/15))
+c = rep ( 0 ,Np) #Intialise to zeros
+for (h in 1 :Np) {
+  for (h1 in 1 :Np) {
+    c[h] = c[h] + (x[h1]*exp(-1i*2*pi*(h1-1)*(h-1)/Np))
+  }
+  c[h] = c[h]/Np 
+}
+plot(seq(0 ,1-(1/Np),1/Np),abs(c),type="l", main = "Magnitude plot", xlab = "Frequency(rad/s)", ylab = "|c|")
+frame()
+plot(seq(0,1-(1/Np), 1/Np), Arg(c)*180/pi, type = "l", main = "Phase plot", xlab = "Frequency(rad/s)", ylab = "Phase")
+
+```
+
+
+b) $$c_n= cos\left(\frac{\pi n}{4}\right) + sin\left(\frac{3\pi n}{4}\right)$$
+
+The fundamental period Np is 8 samples. The series $x[k]$ is given by 
+
+$$x[k] = \sum_{n = 0}^7C_nexp(j2\pi nk)$$
+Calculating coefficients in R, we get 
+
+$$x[k]= {0, 4, 4i, 0, 0, -4i, 4 }$$ starting from $k = 0$
+
+c) Periodic Signal $x[k] = {1,0,1,2,3,2}
+
+The Parseval's identity for a periodic signal is given by 
+
+$$\sum_{k=0}^{N-1}|x[k]|^2 = \frac{1}{N}\sum_{k=0}^{N-1}|C_n|^2 $$
+where $X[n]$ is Fourier coefficient of $x[k]$. Substituting given series in the equation, we get
+
+$$ \sum_{k=0}^5 |x[k]|^2 = 19 $$
+and 
+
+$$\frac{1}{6}\sum_{n=0}^{5}|X[n]|^2 = 19 $$
+
+Hence, Parseval's identity has been proved.
+
+
+### Q.2 Fourier Transform and FRF
+
+a) 
+
+i) X(0) 
+
+$$X(0) = \sum_{k=-\infty}^{\infty} x[k]$$
+$$X(0) = \sum_{k=-2}^{2}x[k] = -1$$
+
+ii) $$\int_{-\pi}^{\pi} X(\omega) e^{-2j\omega} d\omega = x[-2] = -1 $$
+
+
+
+iii) $X(\pi)$
+
+$$X(\omega) = \sum_{k = -\infty}^{\infty}x[k]cos(\omega k)$$
+Since the sequence is even imaginary terms cancel out
+
+$$X(\pi) = \sum_{k=-\infty}^{\infty} (-1)^k x[k] = -9 $$
+
+
+iv) 
+
+$$\int_{-\infty}^{\infty}|X(\omega)|^2 d \omega = 2\pi \sum_{k = -\infty}^{\infty} |x[k]|^2 = 38\pi $$
+
+b)  $$ y[k] - 1.4y[k-1] + 0.45y[k-2] = u[k] + 0.5u[k-1]$$
+
+
+$$G(z^{-1}) = \frac{1 + 0.5z^{-1}}{1 - 1.4z^{-1} + 0.45z^{-2}}$$
+Frequency response function:
+
+$$G(\omega) = \frac{1 + 0.5e^{-j\omega}}{1 - 1.4e^{-j\omega} + 0.45e^{-2j\omega}}$$
+c)
+
+```{r}
+frf = function(x)(1 + 0.5*exp(-1i*x))/(1 - 1.4*exp(-1i*x) + 0.45*exp(-2i*x))
+x = seq(from = 0, to = pi, by = 0.1)
+plot(abs(frf(x)), ylab = "Magnitude (dB)", xlab = "Normalized frequency")
+plot(Arg(frf(x)), ylab = "Phase (degress)", xlab = "Normalized frequency")
+
+```
+
+From the above plots, we can conclude that it is a low pass filter.
+
+
+### Q.3 Modelling non- stationary process
+
+The given co2 data is as follows 
+
+```{r}
+plot(co2)
+
+train  = co2[1:420]
+
+
+##co2.stl <- stl(train,s.window = "periodic")
+#plot(co2.stl)
+
+lin = 1:length(train)
+ap <- lm(train~poly(lin,3)) #Fitting the polynomial of order 3
+print(ap)
+
+ap_3 = ap$residuals
+plot(ap_3)
+
+acf(ap_3)
+```
+
+
+
+From the above plot, we can say that the residuals obtained after fitting the data with polynomial of degree 3 has seasonality of 12 which is obvious given the annually repeated pattern.
+
+```{r}
+period = lm(ap_3 ~ sin(2*pi*lin/12)+I(cos(2*pi*lin/12))+I(sin(4*pi*lin/12))+I(cos(4*pi*lin/12)))
+#Including the 2nd and 3rd harmonic 
+
+plot(period$fitted.values)
+lines(fitted(period)~lin,col=3)
+
+```
+
+
+
+The above plot of sum of sines and cosines of the 1st and 2nd  harmonic has been fitted to the Residual data.
+
+
+```{r}
+summary(period)
+
+ap_sea = period$residuals
+plot(ap_sea)
+acf(ap_sea, lag.max = 100)
+pacf(ap_sea)
+
+```
+
+
+
+Observing the PACF of the residual obtained  after fitting the trend and seasonality we can vaguely conclude the process is AR(13)
+
+```{r}
+armod = arima(ap_sea, c(13,0,0))
+armo  = ar(ap_sea, aic = TRUE, order.max = 13)
+print(armod)
+print(armo)
+
+
+plot(armod$residuals)
+acf(armod$residuals)
+pacf(armod$residuals)
+
+```
+
+Above we can see that from both method ('arima' and 'ar' function) AR(13) model has been chosen comparing the AIC's of all the AR model upto order 13.
+
+
+Also, we can clearly see that the AR(13) model overfits the data but the residuals obtained after fitting the AR(13) model satisfies the white noise characteristics.
+
+Hence, comprising the overfitting test we chose AR(13) model to fit the stationary process of the given co2 data.
+
+$$  x[k] = 334.251 + 263.306k +29.209k^2 - 8.685k^3 + 2.159sin\left(\frac{2\pi k }{12}\right) - 1.727cos\left(\frac{2\pi k }{12}\right) - 0.0081sin\left(\frac{2\pi k }{6}\right) + 0.762cos\left(\frac{2\pi k }{6}\right) + v[k]$$
+where, 
+
+$$v[k] = \left(\frac{1}{0.6739v[k-1] + 0.0912v[k-2] + 0.0508v[k-3] + 0.0739v[k-4] - 0.6653v[k-5] - 0.0222v[k-6] + 0.0501v[k-7] + 0.0069v[k-8] + 0.933v[k-9] - 0.1892v[k-10] + 0.0809v[k-11] + 0.2292v[k-12] - 0.2558v[k-13]}\right)e[k]$$
+
+Now we cross-validate the model on the remaining dataset of size N=48, we get
+
+```{r}
+set.seed(21)
+t = 1:468
+test = co2[421:468]
+#vk = arima.sim(468, model = list(ar = c(-0.6379, -0.0912, -0.0508, -0.0739, 0.6653,0.0222,-0.0101,-0.0069, -0.1933, 0.1892, -0.0809, -0.2292, 0.2558), ma = c(0,0,0))) 
+
+#Error : model not stationary
+
+seasonal = 2.159*sin(2*pi*t/12) - 1.727*cos(2*pi*t/12) - 0.008085*sin(2*pi*t/6) + 0.7619*cos(2*pi*t/6)
+
+#xk = 334.251 + 263.306*t + 29.209*t^2 - 8.685*t^3 + vk + seasonal
+
+#plot(xk)
+
+```
+
+
+### Q.4 ACVF from PSD
+
+The p.s.d of a stationary process is given by
+
+$$\gamma_{xx}(f) = \frac{1.44}{1.16 - 0.8cos(2\pi f)}$$
+
+
+$$\gamma_{xx}(\omega) = \frac{1.44}{2\pi}\frac{1}{1.16 - 0.8cos(\omega)}$$
+$$ |H(e^{-j \omega l})|^2 = \frac{1}{1.16 - 0.8cos(\omega)}$$
+We know that, 
+
+$$ |H(e^{-j \omega l})|^2 = H(q)H(q^{-1})$$
+Therefore factorization gives,
+
+$$H(q^{-1}) = \frac{1}{1-0.4q^{-1}}$$
+We can conclude that,
+
+It is an AR(1) process $d_1 = 0.4$ and $\sigma_e^2 = 1.44$
+
+$$\sigma[0] = \frac{\sigma^2_e}{1 - d_1^2}$$
+Therefore, $\sigma[0] = 1.7143$
+
+$$\sigma[1] = (-d_1)\sigma[0] \Rightarrow \sigma[1] = 0.6857$$
+Similarly, 
+
+$\sigma[2] = 0.2743$ $\sigma[3] = 0.1097$  $\sigma[4] = 0.0438$  
+$\sigma[5] = 0.0175$
+
+Using the inverse Fourier transform in R
+
+```{r}
+f  = seq(from = -0.5, to = 0.5, by = 0.01)
+psd = 1.44/(1.16 - 0.8*cos(2*pi*f))
+invft = abs(fft(psd , inverse = TRUE))/length(psd)
+invft[1:5]
+```
+
+
+###Q.4 Power spectral density estimation
+
+Simulating series 
+
+```{r}
+#Simulating series
+
+set.seed(323)
+yk = arima.sim(model = list(ar = c(0,0.25), ma = 0.45), 1500)
+
+plot(yk)
+acf(yk)
+pacf(yk)
+
+```
+
+
+
+i) Estimating the ACVF and using W-K theorem
+
+From the Weiner-Khinchin Theorem,
+$$ \gamma_{vv}(\omega) = \frac{1}{2\pi}\sum_{l = -\infty}^{\infty} \sigma[l]e^{-j\omega l}$$
+$$\gamma_{vv}(\omega) = \frac{1}{2\pi}\left(\sigma[0] + 2\sum_{l=0}^{\infty} \sigma[l]cos(\omega l)\right)$$
+
+Usually, we do not have estimates of the ACVF at large lags, However, the ACVF of a stationary time series dies down after few lags. Therefore we can truncate the above expression to the first few lags. 
+
+$$\gamma_{vv}(\omega) = \frac{1}{2\pi}\left(\sigma[0] + 2\sum_{l=0}^{l_{max}} \sigma[l]cos(\omega l)\right)$$
+
+
+
+
+```{r}
+
+
+#PSD from Weiner-Khinchin
+
+psd_acf = function(w, acvf, lag_max){
+  
+  k = 1:lag_max
+  psd_ = (acvf[1] + 2*sum(acvf[-1]*cos(w*k)))/(2*pi)
+  psd_
+}
+
+w = seq(0,pi,length = 1000)
+lag_max = c(3,10,20,40)
+wk_gamma = matrix(nrow = 1000, ncol = 4)
+
+for (i in seq_along(lag_max)) {
+  acvf = acf(yk, lag_max[i], type = "covariance", plot = FALSE)
+  wk_gamma[,i] = sapply(w, psd_acf, acvf$acf, lag_max[i])
+  
+  
+}
+plot( w, wk_gamma[,1], main = "Maximum Lag n = 3", xlab = "Frequncy (rad/s)", ylab = "PSD")
+plot( w, wk_gamma[,2], main = "Maximum Lag n = 10",xlab = "Frequncy (rad/s)", ylab = "PSD")
+plot( w, wk_gamma[,3], main = "Maximum Lag n = 20",xlab = "Frequncy (rad/s)", ylab = "PSD")
+plot( w, wk_gamma[,4], main = "Maximum Lag n = 40",xlab = "Frequncy (rad/s)", ylab = "PSD")
+
+
+```
+
+
+As we can see from the above graph, with the first method PSD is sensitive to the maximum lag and the noise increases as maximum lag is increased.
+
+
+ii)Estimation from Time-series model
+
+Observing the ACF and PACF plot, we see that the ACF plot dies down after lag 2 and PACF plot dies after lag 3. Therefore we choose to fit an ARMA(3,2) model. 
+
+```{r}
+#PSD from time series modelling
+
+arma = arima(yk, order= c(3,0,2))
+print(arma)
+
+```
+
+We can see that the coefficients are insignificant. Therefore this is not the right model. Now we fit an AR(3) model.
+```{r}
+armod3 = arima(yk, order = c(3,0,0))
+
+armod1 = arima(yk, order = c(1,0,0))
+print(armod3)
+print(armod1)
+```
+
+Among the above 2 models, AR(3) seems to be a better fit
+Now checking for underfitting 
+
+```{r}
+plot(armod3$residuals)
+acf(armod3$residuals)
+pacf(armod3$residuals)
+```
+
+The above figures does indicate WN characteristics, 
+So AR(3) is almost a perfect fit 
+
+```{r}
+#transfer function
+
+H = function(w)1/(1 + 0.4422*exp(-1i*w) + 0.0805*exp(-2i*w) - 0.0948*exp(-3i*w))
+
+gamma_mod = abs(sapply(w,H))^2*0.9842/(2*pi)
+
+#actual transfer function
+
+H_actual = function(w)(1 + 0.45*exp(-1i*w))/(1 + 0.25*exp(-2i*w))
+
+gamma_actual = abs(sapply(w,H_actual))^2/(2*pi)
+
+plot(w, gamma_mod, main = "PSD - Estimated TS model", xlab = "Frequency (rad/s)", ylab = "PSD")
+plot(w, gamma_actual,main = "PSD - Original TS model", xlab = "Frequency (rad/s)", ylab = "PSD")
+
+```
+
+We can clearly see there is a difference between original and estimated model plot of PSD vs frequency
+
+To conclude 
+
+The first method being the non-parametric approach is easier to use since we don't have to fit any model. As we saw earlier the estimate is maximum lag sensitive and hence noisy. In the second approach we have less parameters to fit. However fitted model maybe different from the original data generating process and may result in incorrect estimates.

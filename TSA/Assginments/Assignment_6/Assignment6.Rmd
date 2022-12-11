@@ -1,0 +1,378 @@
+---
+title: 'Assignment 6: CH5350'
+author: "Abhijeet Mavi"
+output:
+  html_document: default
+  word_document: default
+---
+
+# MLE and Least Squares Estimate
+
+We are given x[1] and x[2] here. So, the given equation is.
+
+$$x[k]=-d_1 x[k-1]+e[k]$$
+So, we have to evaluate $d_1$ and $\sigma ^2_e$ here. In order to do so, we will assume that the series is zero-mean stationary, we will get
+
+$$E(x[1])=0$$
+
+$$\sigma_{x[1]}=\frac{\sigma_e^2}{1-d_1^2}$$
+
+
+Also,
+
+$$E(x[2]|x[1])=-d_1x[1]$$
+
+$$\sigma^2_{x[2]|x[1]}=\sigma ^2_e$$
+
+Now for likelihood function, we will write the joint distribution of the following as follows:
+
+$$f(x^2;\theta)=f(x[1];\theta)*f(x[2]|x[1];\theta)=(\frac{\sqrt{1-d_1^2}}{\sqrt{2\pi \sigma_e^2}} exp(-0.5\frac{x^2[1](1-d_1^2)}{\sigma_e^2}))*(\frac{1}{\sqrt{2\pi \sigma_e^2}}exp(-0.5\frac{(x[2]+d_1x[1])^2}{\sigma_e^2}))$$
+
+$$f(x^2;\theta)=\frac{1}{2\pi \sigma^2_e}exp(-0.5 \frac{x^2[2]+2d_1x[1]x[2]+x^2[1]}{\sigma_e^2})$$
+
+We take the log-likelihood as follows,
+
+$$L=c+\frac1 2ln(1-d_1^2)-2ln(\sigma)-(\frac 1 2 \frac{x^2[2]+2d_1x[1]x[2]+x^2[1]}{\sigma_e^2})$$
+
+Now, for maximum likelihoood of $\theta=[\sigma^2_e$ $d_1]$, we have $\frac{\partial L}{\partial \sigma_e^2}$ and $\frac{\partial L}{\partial d_1}$. Then , I solved the 2-equation, 2-variable system, we get:
+
+$$\hat{d_1}=\frac{-2x[1]x[2]}{x^2[1]+x^2[2]}$$
+
+$$\hat{\sigma_e^2}=\frac{(x^2[1]-x^2[2])^2}{2(x^2[1]+x^2[2])}$$
+
+
+For the Least-square estimates,
+
+$$x[2]=-d_1x[1]+e[2]$$
+
+
+Hence, the least squares solution for this:
+
+$$\hat{d_1}=-\frac{x[2]}{x[1]}$$
+
+Hence, we get
+
+$$E((x[2]-\hat{x}[2])^2)=0$$
+
+Hence, there is no noise in variance, as $\hat{\sigma}_e^2=0$.
+
+As, the variance of LS estimate is much lower than the MLE estimator, I believe that **LS is a better estimator in this case.**
+
+# Hannan-Rissanen Algorithm
+
+```{r, eval=F}
+
+arma_hn=function(series,ar_order,ma_order){
+    
+  len_ser=length(series)
+  
+  max_order=5
+  
+  ar5mod=arima(series,c(5,0,0))
+  
+```
+  
+  
+  I formulated an AR(5) model to first find the coefficients of e[k]. This formulated noise would then serve as regressors for moving average part of the ARMA models. Then, the z_mat formulated in the code snippet below served as regressor to our overall problem statement, and we applied the least squares solution according to Projection theorem as follows.
+  
+  $$\hat \phi = (Z^TZ)^{-1}Z^TY$$
+  
+  where $\hat \phi$ served as the estimated parameter set
+  
+```{r,eval=F}  
+arma_hn=function(series,ar_order,ma_order){
+    
+  len_ser=length(series)
+  
+  max_order=5
+  
+  ar5mod=arima(series,c(5,0,0))
+  res_ek=ar5mod$residuals
+  
+  res_ek=res_ek[which(is.na(res_ek)==F)]
+  
+  ser_new=series[max(ar_order,ma_order):len_ser]
+    
+  z_mat=matrix(NA,nrow=(len_ser-(max(ma_order,ar_order))-1),ncol=(ar_order+ma_order))
+  
+  for(i in 1:(ar_order)){
+    
+    z_mat[,i]=series[(max(ar_order,ma_order)-i+2):(len_ser-i)]
+    
+  }
+  
+  
+  
+  
+  for(i in 1:(ma_order)){
+    
+    z_mat[,(i+ar_order)]=res_ek[(max(ar_order,ma_order)-i+2):(len_ser-i)]
+    
+  }
+  
+  par_set=((qr.solve(t(z_mat) %*% z_mat)) %*% t(z_mat)) %*% series[(max(ar_order,ma_order)+2):len_ser]
+  
+  return(par_set)
+}
+
+
+ak=arima.sim(n = 100000, list( ar=c(0.4),ma = c(0.7, 0.12)),sd = sqrt(1))
+
+ak1=arima.sim(n = 100000, list( ma = c(1, 0.21)),sd = sqrt(1))
+arma_hn(ak1,0,2)
+
+arma_hn(ak,1,2)
+
+
+```
+
+I then supplied  MA(2) process with c1 = 1, c2 = 0.21 and ARMA(1,2) process with d1 = 0.4, c1 = 0.7, c2 = 0.12.
+
+For MA(2), I got c1 as **0.99** and c2 as **0.20**.
+For ARMA(1,2), we got d1 as **0.41**, c1 as **0.69** and c2 as **0.11**. These values are quite close to the real values.
+
+```{r}
+library(tseries)
+
+ak=arima.sim(n = 100000, list( ar=c(0.4),ma = c(0.7, 0.12)),sd = sqrt(1))
+ak1=arima.sim(n = 100000, list( ma = c(1, 0.21)),sd = sqrt(1))
+
+
+arma12mod=arma(ak,c(1,2))
+arma12mod$coef
+
+ma2mod=arma(ak1,c(0,2))
+ma2mod$coef
+```
+
+Again, the values are closer to the **arma()** routine as shown.
+
+
+
+## Spectral Densities
+
+We see that the given model is
+
+$$ x[k]=e[k-2]+2e[k-1]+ 4e[k]$$
+
+We can find $\gamma (\omega)$ using the function
+$$\gamma (\omega)=\frac{\Sigma_{l=-\infty}^{l=\infty} \sigma[l]e^{-j\omega l}}{2 \pi}$$
+
+We find that,
+
+$$\gamma (\omega)=\frac{\sigma^2_e}{2 \pi}[20+20cos(\omega)+8cos(2 \omega)]$$
+```{r}
+
+psd={}
+omega=seq(0,3.14,by=0.01)
+for (i in 1:length(omega)){
+  
+  psd[i]=(20+(20*cos(omega[i]))+(8*cos(2*omega[i])))/6.28
+} 
+plot(omega,psd)
+lines(omega,psd)
+
+
+```
+
+Now, we will generate 2000 samples of the said dataset as follows
+
+
+```{r}
+
+
+ek=rnorm(10000)
+
+xk=ek[4001:6000]
+
+plot(xk, type='l')
+
+```
+
+
+We then apply periodogram to it as follows:
+
+
+```{r}
+library(TSA)
+
+periodogram(xk)
+
+# For Daniell's method
+
+spec.pgram(xk , spans=c( 9 , 9 , 9 , 9 , 9 ))
+
+```
+
+
+The Welch's periodogram is plotted using **SDF()** function as follows:
+
+```{r}
+library(sapa)
+plot(SDF(xk ,method="wosa" , blocksize= 70))
+```
+
+We will now ry to fit an MA(2) model for our process, and then try to calculate the PSD of it using parameters c1 and c2. We know that $\sigma [0]=1+c_1^2+c_2^2$, $\sigma [1]=c_1+c_1c_2$ and $\sigma [2]=c_2$ for an MA(2) process.
+
+```{r}
+ma2mod=arima(xk,c(0,0,2))
+c1=ma2mod$coef[1]
+c2=ma2mod$coef
+
+err_sig=ma2mod$sigma2
+
+freq_mat=seq(0,0.5,by=0.001)
+
+spec_dens= (err_sig)*((1+(c1^2)+(c2^2))+2*(c1+(c1*c2))*cos(2*pi*freq_mat)+2*c2*cos(2*2*pi*freq_mat))
+
+
+plot(freq_mat,spec_dens,type='l')
+
+```
+
+
+
+It is quite clear from the whole process that parametric method gives the best form of PSD, evn though the graph does not accurately describe ou process but it gives the smoothest approximation of all as compared to non-parametric ones. Note that, for the original process I have plotted $\omega$ and for subsequent processes, I plotted frequencies.
+
+
+# Fitting a time-series model: tcm1yd
+
+```{r setup, include=TRUE}
+library(tseries)
+library(TSA)
+data(tcmd)
+vk=tcm1yd
+
+plot(vk)
+```
+
+
+
+We first load the tcmd model and, and then take tcm1yd from it. We then plot it as shown above.
+
+
+```{r}
+periodogram(vk)
+
+acf(vk)
+
+pacf(vk)
+
+```
+
+The periodogram, acf, and pacf clearly shows that there are trends in the series. Particularly differencing trends. This is because the decay in acf is too slow and the periodogram shows high power at lower frequency, a characteristic of differencing series.
+
+
+```{r}
+diff_vk= diff(vk)
+
+adf.test(diff_vk)
+
+acf(diff_vk)
+periodogram(diff_vk)
+```
+
+I then differenced the series once, and then applied the Augmented Dickey-Fuller test using **adf.test()**. It clearly showed that null hypothesis can be rejected of the series requiring any more differencing. 
+
+The periodogram further reaffirmed my hypotheses as shown.
+
+```{r}
+plot(diff_vk)
+
+arma33mod=arima(diff_vk, order=c(3,0,3))
+
+arma33mod
+
+acf(arma33mod$residuals)
+
+pacf(arma33mod$residuals)
+
+```
+
+I then tried to fit various ARMA models to the series and was able to properly fit the ARMA(3,3) to the differenced series. Even though it showed a bit of underfitting discrepancies, it fit our model the best in all the possible models of 10th order.
+
+Hence, our final series looks like as follows:
+
+$$\nabla v[k]=0.2772v[k-1]+0.2861v[k-2] + 0.2988v[k-3]  -0.1692e[k-1]  -0.2708e[k-2]  -0.3410e[k-3]+e[k]  $$
+The estimated $\sigma ^2_e$ is **0.00904**.
+
+
+
+
+## Predictions using Projection Theorem
+
+For the given series, we have 
+
+$$x[k]=e[k]-e[k-1]$$
+
+For any process, the best predictor is the linear sum of its past realizations,
+
+$$\hat x[k|k-1]=\Sigma_{i=0}^{k-1} \phi[i]x[k-i]$$
+
+We see that $\sigma[0]=2 \sigma^2_e$ and $\sigma [1]=- \sigma^2_e$.
+Now, using Yule-Walker's equations we construct the following matrix.
+
+
+$$
+\sigma^2_e \left(\begin{array}{cc} 
+2 & -1 & 0&...& 0\\
+-1 & 2&-1& ...&0\\
+0&-1&2&...&0\\
+...& ...&...&...&2
+\end{array}\right)
+\left(\begin{array}{cc} 
+\phi_1\\ 
+\phi_2\\
+...\\
+\phi_k
+\end{array}\right)=\left(\begin{array}{cc} 
+-1\\ 
+0\\
+...\\
+0
+\end{array}\right)
+$$ 
+
+I solved the given matrix system to find that,
+
+$$\left(\begin{array}{cc} 
+\phi_1\\ 
+\phi_2\\
+...\\
+\phi_k
+\end{array}\right)=\left(\begin{array}{cc} 
+-\frac{k}{k+1}\\ 
+-\frac{k-1}{k+1}\\
+...\\
+-\frac{1}{k+1}
+\end{array}\right)$$
+
+
+And hence,     
+
+$$\hat x[k|k-1]=-\Sigma_{i=1}^{k} \frac{k-i+1}{k+1}x[k-i]$$
+
+Now, in order to calculate MSE for the above derived BLP estimate, we have 
+
+$$MSE=E((x[k]-\hat x[k|k-1])^2)$$
+
+$$ MSE=E((x[k]+\Sigma_{i=1}^{k} \frac{k-i+1}{k+1}x[k-i])^2)$$
+
+$$MSE=2\sigma^2_e -2\frac{k}{k+1  }\sigma^2_e+E(\Sigma_{i=1}^{k} (\frac{k-i+1}{k+1})^2x[k-i]^2)+E(\Sigma\Sigma_{i !=j}\frac{k-i+1}{k+1}\frac{k-i}{k+1}x[k-i]x[k-i-j])$$
+We will only see j for j=1, since all the other covariances are 0. 
+Expanding, the expectations terms, we get
+$$MSE=2\sigma^2_e -2\frac{k}{k+1}\sigma^2_e+2E(\Sigma_{i=1}^{k} (\frac{k-i+1}{k+1})^2x[k-i]^2)+2E(\Sigma_{i=1}^{k-1}\frac{k-i+1}{k+1} \frac{k-i}{k+1}x[k-i]x[k-i-1])$$
+
+The third and fourth terms are happening hen l=0 and l=1.
+
+
+Further, simplifying, we would get,
+
+$$\frac{2\sigma^2_e}{k+1} + 2\sigma^2_e \Sigma_{i=1}^{k} (\frac{k-i+1}{(k+1)^2})= \frac{2\sigma^2_e}{k+1}(1+\frac k 2)=\frac{k+2}{k+1}\sigma^2_e$$
+
+
+Hence, proved that MSE is $\frac{k+2}{k+1}\sigma^2_e$.
+
+
+
+

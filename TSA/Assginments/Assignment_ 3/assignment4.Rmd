@@ -1,0 +1,349 @@
+---
+title: 'Assignment 3: Applied Time Series Analysis'
+author: 'Abhijeet Mavi: BE14B001'
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# ARIMA Process
+##1.a)
+
+Here, it is given that 
+$$H_1 (q^{-1}) = \frac{1}{1-0.8 q^{-1}+0.12q^{-2}}$$
+
+
+This can be written as:
+$$H_1 (q^{-1}) = \frac{1}{2}\left( \frac{3}{1-(0.6)q^{-1}} - \frac{1}{1-0.2q^{-1}} \right)$$
+
+
+This when written in simplest form to give h[n], we get,
+
+ 
+
+$$H_1 (q^{-1}) = \frac{1}{2}\left( 3\Sigma_{n=0}^{\infty} 0.6^n q^{-n} - \Sigma_{n=0}^{\infty} 0.2^nq^{-n}\right)$$
+Hence,
+
+ 
+
+>$$h[n] = \frac{1}{2}\left( 3*0.6^n - 0.2^n\right)$$
+
+**The above term is for all n>=0**.
+
+For the given ARMA (1,1) process, we can do the same transformation, we will get after Taylor series expansion,
+
+$$H(q^{-1}) = (1+0.3q^{-1})(\Sigma_0^\infty 0.6^n q^{-n})$$
+
+
+ 
+>$$h[n] = 0.6^n + 0.3(0.6^n)$$
+
+The above term is for all n>0.
+
+>We see that **h[n] is 1 for n=1** and **0 for all n<0**.
+
+## 1.b)
+Here, we first plot the data.
+
+```{r cars}
+load("a3_q1.Rdata")
+plot(xk)
+```
+As one can see, the data is clearly non-stationary. So, we check using **adf.test()** whose null hypotheses states that the data has a unit root.
+
+```{r}
+library(aTSA)
+adf.test(xk)
+```
+
+
+We see that null hypothesis cannot be rejected in this case and hence we need to difference the series.
+
+Post-differencing, let's look at the data and its respective ACF and PACF.
+
+```{r}
+diff_ser<-diff(xk)
+plot(diff_ser)
+acf(diff_ser)
+pacf(diff_ser)
+```
+
+From ACF plot, it can be seen that it is an MA(10) process, but PACF plot shows that it is an AR(3) process. Lets try to model both.
+
+
+```{r}
+ma10mod <- arima(diff_ser,order=c(0,0,10))
+ma10mod
+ar3mod <- arima(diff_ser, order = c(3,0,0))
+ar3mod
+```
+
+As one can see clearly that the **AIC(AR(3)) < AIC(MA(10))**, hence the preferred model is AR(3) here. On top of that, the **10th** coefficient of MA(10) overfits for a 99% confidence interval.
+
+Now, let us look at the ACF and PACF of residuals of our AR(3) model.
+```{r}
+acf(ar3mod$residuals)
+pacf(ar3mod$residuals)
+```
+
+
+As expected, they show a white noise characteristic. Hence, we can conclude that our data is a **1-time differenced AR(3) process**.
+
+
+>$$\nabla v[k] = 1.674v[k-1]-0.921v[k-2]+0.174v[k-3]+e[k]$$
+
+
+## 1.c)
+Given that,
+
+$$v[k]=-d_1 v[k-1] +e[k]$$
+
+>We know that if we are given information about the past, then the best predicted value is the **Expectation E(.)** of the process.
+
+$$\hat{v}[k+1|k] = -d_1 v[k]$$
+
+Moving on for 2-more steps, we get
+
+$$\hat{v}[k+3|k] = -d_1^3 v[k]$$
+
+Now, let us see what is the true value of v[k+3],
+$$v[k+2]=d_1^2 v[k] - d_1e[k+1]+e[k+2]$$
+$$v[k+3]=-d_1^3v[k] + d_1^2 e[k+1] - d_1e[k+2]+e[k+3]$$
+$$Error = v[k+3] - \hat{v}[k+3|k]$$
+This implies,
+
+$$Error=d_1^2 e[k+1] - d_1e[k+2]+e[k+3]$$
+
+> $$\sigma^2_{k+3} = (1+ d_1^2 + d_1^4)\sigma_e^2$$
+
+#Computing Correlations
+
+## 2.a)
+
+Given that,
+
+$$y[k] = \frac{b_2^0q^{-2}}{1+f_1^0q^{-1}}u[k] + e[k] $$
+where, u[k] and e[k] both are Gaussian White Noise processes. Hence, the **mean of y[k]=0.**
+
+Expanding the denominator of first term to $\Sigma_{n=0}^\infty (-f_1^0)^nq^{-n}$, we get
+
+$$y[k] = (b_2^0\Sigma_{n=0}^\infty (-f_1^0)^nq^{(-n+2)}u[k]) + e[k] $$
+Now, given that $\sigma_{eu}[l]=0$ for all l, hence,
+
+>$$\sigma_{y}^2 = \frac{(b_2^0)^2}{1-(f_1^0)^2}\sigma_u^2 +\sigma_e^2$$
+
+$$y[k-1] = (b_2^0\Sigma_{n=0}^\infty (-f_1^0)^nq^{(-n+3)}u[k]) + e[k-1]$$
+This implies,
+$$\sigma_{yy}[1] = (b_2^0)^2(-f_1^0)+(b_2^0)^2(-f_1^0)^3+(b_2^0)^2(-f_1^0)^5.....\infty$$
+
+Since, $\sigma_{ee}[1]=0$
+
+> $$\sigma_{yy}[1] = (b_2^0)^2 \frac{-f_1^0}{1-(f_1^0)^2}\sigma^2_u$$
+
+
+> Here, **$\sigma_{yu}[1]=0$ since there is no term of u[k-1] in the y[k] term**. 
+
+For, $\sigma_{yu}[2]$, we will only consider the first term (n=0) of the y[k] sequence involving u[k] because the correlation with all other terms and e[k] will be 0.
+
+>$$\sigma_{yu}[2] = b_2^0]\sigma^2_u$$
+
+## 2.b)
+**One interesting observation that one can notice is that as we keep increasing the lag, our $\sigma_{yu}[2]$ will only get multiplied by $(-f_1^0)^{l-2}$.**
+
+So,
+
+>$$\frac{\sigma_{yu}[l]}{\sigma_{yu}[2]} = (-f_1^0)^{l-2}$$
+
+This is valid for all l>=2. Since $|f_1^0|<1$, hence the maximum correlation will be seen at lag 2 only as the correlation will keep decreasing like an AR(1) process. The delay is seen at the point of maximum correaltion. Hence, the  delay is **2**.
+
+# Processes with Trend
+
+## Fitting a linear trend
+
+Here, in order to visualise the linear trend, let's plot the series
+
+```{r}
+library(stats)
+
+load("a3_q3.Rdata")
+
+plot(xk)
+
+lin_fit <- 1:1000 
+
+lin_mod <- lm(xk ~ lin_fit)
+
+lin_mod
+
+plot(lin_mod$residuals)
+
+acf(lin_mod$residuals)
+
+pacf(lin_mod$residuals)
+```
+ 
+Here, we see that series perfectly fits a linear trend with **intercept=0.875** and **slope=0.02**. We then check the residuals of the series and we see that it is either an AR(3) or an AR(4) process as seen from PACF plot of residuals.
+
+```{r}
+ar3mod <- arima(lin_mod$residuals,order = c(3,0,0))
+ar3mod
+ar4mod <- arima(lin_mod$residuals,order = c(4,0,0))
+ar4mod
+```
+
+We see that the fourth coefficient of AR(4) model does not satisfy the 99% confidence interval. hence, our preferred model is AR(3) in this case.
+
+We further check if ar3mod has its residues as white noise
+
+```{r}
+
+acf(ar3mod$residuals)
+
+pacf(ar3mod$residuals)
+
+```
+
+And it's evident from above plots that the residues are of white-noise nature.
+
+>$$v[k] =  0.02k + 0.875 + 0.9858v[k-1]  -0.3988v[k-2] + 0.1001v[k-3]+e[k]$$
+
+> The major advantage of linear trend fitting is that the residuals will give white noise for an ARMA fit to linear tred, but while estimating the parameters of linear trend, if not done properly they will give a non-stationary process instead.
+
+
+## Differencing the series
+
+In this method, we difference the series once to accomodate the effect of linear trend and then, further fit an ARMA model as follows:
+
+```{r}
+diff_ser <- diff(xk)
+
+plot(diff_ser)
+
+acf(diff_ser)
+
+pacf(diff_ser)
+
+```
+
+We see that the differenced series a stationary process, but one can't make out it's order through ACF or PACF. So, I tried various combinations of ARMA models, by keeping in mind the parsimony of the modelling technique, I was able to fit ARMA(1,2).
+
+```{r}
+arma12mod <- arima(diff_ser,c(1,0,2))
+
+arma12mod
+
+acf(arma12mod$residuals)
+
+```
+
+Hence, our final model satisfies both the overfit test (no parameter outside 99% CI) and underfit test (white noise nature of residues) as shown above, but we also see that we have an intercept term here.
+
+$$\nabla v[k] = 0.5575v[k-1]  -0.5685e[k]  -e[k-1]0.4315+     0.0201+e[k]$$
+
+A major advantage of modelling with differenced series is that it does not require parameter estimation of additional parameters since it's a **non-parametric method**, but at the same time introduces a unit pole which needs to be accounted for and generally bring a bit complication with itself.
+
+
+#Variance-type non-Stationarities
+
+Let us first take a look at w[k] series given.
+
+```{r}
+
+library(MLmetrics)
+
+load("a3_q4.Rdata")
+
+plot(wk)
+
+mse_mat <- {} #matrix for storing MSE
+
+lambdas <- {}
+
+k<-1:4999
+k<-append(k,5001:10000)
+
+#k includes all lambda [-5,5] except 0
+
+for (i in k){
+
+lambda <- -5 + (i*0.001) #lambda changed with 0.1 increment
+  
+lambdas[i] <- lambda
+
+#transforming both training and test data
+
+trans_data <- ((wk^lambda)-1)/lambda
+
+train_data <- trans_data[1:800]
+
+test_data <-  wk[801:1000]
+
+#Fitting an AR model
+arPmod <- ar(train_data,aic=TRUE, order.max=6)
+
+#Using filter, arPmod$ar gives coefficients
+new_ser <- filter(test_data,arPmod$ar,method = 'convolution',sides=1)
+
+#Calculating MSE
+mse_i <- MSE(new_ser[((arPmod$order)+1):200],test_data[((arPmod$order)+1):200])
+
+mse_mat[i]<-mse_i
+
+}
+
+#For lambda=0
+
+trans_data0 <- log(wk)
+
+train_data0 <- trans_data0[1:800]
+
+#Fitting an AR model
+arPmod0 <- ar(train_data0,aic=TRUE, order.max=6)
+
+#Using filter, arPmod$ar gives coefficients
+new_ser0 <- filter(test_data,arPmod0$ar,method = 'convolution',sides=1)
+
+#Calculating MSE
+mse_0 <- MSE(new_ser0[((arPmod0$order)+1):200],test_data[((arPmod0$order)+1):200])
+
+mse_mat[5000] <- mse_0
+lambdas[5000] <- 0
+
+```
+
+The above code snippet was used to evaluate the BoxCox transormation for $\lambda=[-5,5]$ with step size of 0.001. I evaluated MSE using MSE() of MLmetrics package and I plotted the graph as follows.
+
+
+```{r}
+plot(lambdas,mse_mat)
+```
+
+The minima is seen at **$\lambda$ = 2.928**. We now fit the AR model pertaining to this $\lambda$ and see how well the coefficients are in enlighnment to BoxCox() in R as follows:
+```{r}
+library(forecast)
+
+lambda_original <- BoxCox.lambda(wk, method = 'guerrero', lower=-5,upper=5)
+boxcox_ser<-BoxCox(wk,lambda_original)
+
+ar_ser<-((wk^2.928) -1)/2.928
+plot(ar_ser)
+plot(boxcox_ser)
+
+acf(boxcox_ser)
+pacf(boxcox_ser)
+
+acf(ar_ser)
+pacf(ar_ser)
+
+arima(boxcox_ser,c(4,0,0))
+arima(ar_ser,c(4,0,0))
+
+```
+
+>As is evident from PACF plots for both series, we can model **AR(4)** processes for both series. We further find the lambda according to Guerrero's method which is **3.3263**. We get around **12.5%** error for our value of estimated $\lambda.$ Also, the transformed series can be seen to have similar coefficients as that of the series transformed using BoxCox() routine.
+
+>$$v[k] = (0.5321v[k-1]+  0.3768v[k-2]  +0.2616v[k-3]  -0.5882v[k-4]+23.9859+e[k])^{\frac{1}{\lambda}}$$
